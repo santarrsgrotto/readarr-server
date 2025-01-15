@@ -5,8 +5,8 @@ import languages from '@cospired/i18n-iso-languages'
 languages.registerLocale(require('@cospired/i18n-iso-languages/langs/en.json'))
 
 /** Converts data object to string */
-export function formatDate(date: Date | null): string {
-  return date ? date.toISOString().slice(0, 19) : '1970-01-01 00:00:00'
+export function formatDate(date: Date | null | undefined, required: boolean = true): string {
+  return date && !isNaN(date.getTime()) ? date.toISOString().slice(0, 19) : required ? '1970-01-01 00:00:00' : ''
 }
 
 /** I.e. https://covers.openlibrary.org/b/id/10521270-L.jpg */

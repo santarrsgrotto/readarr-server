@@ -31,27 +31,26 @@ export async function convertEdition(
     return null
   }
 
+  // If average rating is decent bump up to count to ensure Readarr doesn't skip it
+  if (rating && (rating.average ?? 0) > 2) {
+    rating.count = Math.max(rating.count, 125)
+  }
+
   // OL doesn't have as many ratings as Goodreads
   // So if there's no rating calculate one based on revision count
   // Readarr uses ratings to work out which editions are worth adding, so this is important
-  rating = (rating === undefined ? (await model.getEditionRatings([edition.key]))[0] : rating) ?? {
+  rating = rating ?? {
     workKey: work.key,
     editionKey: edition.key,
-    average: (() => {
-      if (edition.revision > 50) return 5
-      if (edition.revision >= 40) return 4
-      if (edition.revision >= 30) return 3
-      if (edition.revision >= 20) return 2
-      return 1
-    })(),
-    count: edition.revision * 20,
+    average: Math.min(edition.revision, 5),
+    count: edition.revision * 125,
   }
 
   const format: string = formatters.formatFormat(edition.physicalFormat)
 
   return {
     ForeignId: ids.encodeReadarrId(edition.key),
-    Title: edition.title,
+    Title: edition.title ?? work.title ?? 'Unknown',
     Description: work.description ?? '',
     Isbn13: edition.isbn_13[0] ?? '',
     CountryCode: edition.publishCountry ?? '',
@@ -115,11 +114,14 @@ export function convertSeries(series: Series[]): BookInfoSeries[] {
  * Map between OL JSON and Readarr format
  * This leaves setting Authors and Series key up to the caller
  */
-export async function convertWork(work: Work, editions?: Edition[] | null): Promise<BookInfoWork | null> {
+export async function convertWork(
+  work: Work,
+  editions?: Edition[] | null,
+  ratings?: Rating[] | null,
+): Promise<BookInfoWork | null> {
   editions = editions ?? (await model.getWorkEditions([work.key]))
 
-  const ratings: Rating[] =
-    editions.length > 0 ? await model.getEditionRatings(editions.map((edition) => edition.key)) : []
+  ratings = ratings ?? (editions.length > 0 ? await model.getWorkRatings([work.key], true) : [])
 
   const books: BookInfoBook[] = (
     await Promise.all(
@@ -134,14 +136,41 @@ export async function convertWork(work: Work, editions?: Edition[] | null): Prom
     return null
   }
 
+  const earliestPublishDate = editions
+    .map((edition) => edition.publishDate)
+    .filter((date): date is Date => date !== undefined) // Type guard to ensure 'date' is 'Date'
+    .reduce(
+      (earliest: Date | null, current: Date) => (earliest === null || current < earliest ? current : earliest),
+      null as Date | null,
+    )
+
+  // Get rating for the work, or failing that the edition rating with the highest count
+  let workRating: Rating | null =
+    ratings.find((rating) => rating.editionKey === null) ??
+    (ratings.length > 0
+      ? ratings[ratings.map((r) => r.count).indexOf(Math.max(...ratings.map((r) => r.count)))]
+      : null) ??
+    (books.length > 0
+      ? (() => {
+          // Use total count and highest average rating
+          return {
+            workKey: work.key,
+            average: Math.max(...books.map((book) => book.AverageRating)),
+            count: books.reduce((sum, book) => sum + book.RatingCount, 0),
+          }
+        })()
+      : null)
+
   return {
     ForeignId: ids.encodeReadarrId(work.key),
     Title: work.title,
     ReleaseDate: formatters.formatDate(
-      work.created ?? editions[0].publishDate ?? editions[0].created ?? editions[0].lastModified ?? work.lastModified,
+      earliestPublishDate ?? editions[0].created ?? editions[0].lastModified ?? work.lastModified,
     ),
     Url: formatters.formatUrl(work.key),
     Genres: (work.subjects ?? []).filter((genre, i, genres) => genres.indexOf(genre) === i),
+    RatingCount: workRating?.count ?? 0,
+    AverageRating: workRating?.average ?? 0,
     // TODO: related works
     RelatedWorks: [],
     Books: books,

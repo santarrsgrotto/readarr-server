@@ -30,7 +30,7 @@ const server = Bun.serve({
   hostname: config.hostname,
   port: config.port,
   async fetch(req) {
-    console.log('Incoming request:', req.url)
+    console.log(`[${new Date().toISOString()}] Incoming request:`, req.url)
 
     const router = AutoRouter({
       base: '/bookinfo/v1',

@@ -20,14 +20,12 @@ export default async function author(id: string): Promise<Response> {
       return work
     })
 
-    const workKeys: string[] = (bookInfoAuthor.Works ?? []).map((work) => ids.decodeReadarrId(work.ForeignId, 'work'))
+    // Calculate total rating count and average rating across all works
+    const totalRatings = bookInfoAuthor.Works.reduce((sum, work) => sum + work.RatingCount, 0)
+    const totalAverage = bookInfoAuthor.Works.reduce((sum, work) => sum + work.AverageRating * work.RatingCount, 0)
 
-    // Get average rating across all works
-    const workRatings = await model.getWorkRatings(workKeys)
-    const totalAverage = workRatings.reduce((sum, work) => sum + work.average, 0)
-
-    bookInfoAuthor.RatingCount = workRatings.reduce((sum, work) => sum + work.count, 0)
-    bookInfoAuthor.AverageRating = workRatings.length > 0 ? Number((totalAverage / workRatings.length).toFixed(1)) : 0.0
+    bookInfoAuthor.RatingCount = totalRatings
+    bookInfoAuthor.AverageRating = totalRatings > 0 ? Number((totalAverage / totalRatings).toFixed(1)) : 0.0
 
     bookInfoAuthor.Series = convertSeries(
       await model.getWorkSeries(bookInfoAuthor.Works.map((work) => ids.decodeReadarrId(work.ForeignId, 'work'))),
@@ -44,15 +42,18 @@ export default async function author(id: string): Promise<Response> {
 
 async function getWorks(author: Author): Promise<BookInfoWork[]> {
   const works = await model.getAuthorWorks(author.key)
-  const editions = await model.getWorkEditions(works.map((work) => work.key))
+  const workKeys = works.map((work) => work.key)
+
+  const [editions, ratings] = await Promise.all([model.getWorkEditions(workKeys), model.getWorkRatings(workKeys, true)])
 
   return await Promise.all(
     works
       .filter((work) => work.title !== undefined)
       .map(async (work) => {
         const workEditions = editions.filter((edition) => edition.works?.includes(work.key))
+        const workRatings = ratings.filter((rating) => rating.workKey === work.key)
 
-        return editions.length > 0 ? await convertWork(work, workEditions) : null
+        return editions.length > 0 ? await convertWork(work, workEditions, workRatings) : null
       }),
   ).then((results) => results.filter((work): work is BookInfoWork => work != null))
 }

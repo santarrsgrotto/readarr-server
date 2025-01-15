@@ -1,6 +1,7 @@
 import db from './database'
 import * as ids from './ids'
 import type { Author, Edition, Id, Rating, Series, Work } from './types'
+import * as chrono from 'chrono-node'
 import ISBN from 'isbn3'
 
 /** Goodreads -> OL author mapping **/
@@ -112,34 +113,6 @@ export async function getEdition(id: string): Promise<Edition | null> {
     .then((res) => (res.rows[0] ? (processModel(res.rows[0]) as Edition) : null))
 }
 
-/** Get the rating for the given OL edition keys **/
-export async function getEditionRatings(keys: Id[]): Promise<Rating[]> {
-  return db
-    .query(
-      `
-        SELECT
-          work_key,
-          edition_key,
-          ROUND(AVG(rating), 1) as average,
-          COUNT(*) as count
-        FROM ratings
-        WHERE edition_key = ANY($1::text[])
-        GROUP BY work_key, edition_key
-      `,
-      [keys],
-    )
-    .then((res) =>
-      res.rows.map(
-        (row) =>
-          ({
-            ...row,
-            average: parseFloat(row.average),
-            count: parseFloat(row.count),
-          }) as Rating,
-      ),
-    )
-}
-
 /** Get all editions for a given work ID (can be Goodreads ID or OL) **/
 export async function getWork(id: string): Promise<Work | null> {
   const key = ids.isGoodreadsId(id) ? await workToOl(id) : ids.convertOlId(id, 'work')
@@ -187,17 +160,20 @@ export async function getWorkEditions(keys: Id[]): Promise<Edition[]> {
 }
 
 /** Get all ratings for the given OL work keys **/
-export async function getWorkRatings(keys: string[]): Promise<Rating[]> {
+export async function getWorkRatings(keys: Id[], editions: boolean): Promise<Rating[]> {
   return db
     .query(
       `
         SELECT
           work_key,
+          edition_key,
           ROUND(AVG(rating), 1) as average,
           COUNT(*) as count
         FROM ratings
         WHERE work_key = ANY($1::text[])
-        GROUP BY work_key
+        ${editions ? '' : 'AND edition_key IS NULL'}
+        GROUP BY work_key, edition_key
+        ORDER BY edition_key ASC
       `,
       [keys],
     )
@@ -205,7 +181,8 @@ export async function getWorkRatings(keys: string[]): Promise<Rating[]> {
       (res) =>
         res.rows.map((row) => ({
           // Correctly type the number since pg returns strings for decimals
-          ...row,
+          workKey: row.work_key,
+          editionKey: row.edition_key,
           average: parseFloat(row.average as string),
           count: parseInt(row.count as string, 10),
         })) as Rating[],
@@ -257,7 +234,11 @@ export async function getWorkSeries(workKeys: string[]): Promise<Series[]> {
 
 /** Normalise model values */
 export function processModel(row: any): any {
-  const model = { ...row.data }
+  if (!row) return row
+
+  const model = Object.fromEntries(
+    Object.entries(row.data ?? []).map(([key, value]) => [toCamelCase(key), value]),
+  ) as typeof row.data
 
   if (row?.type == '/type/author') {
     if (model.bio?.value) {
@@ -291,7 +272,7 @@ export function processModel(row: any): any {
 
     // This is a year not a date
     if (model?.publishDate) {
-      model.publishDate = new Date(model.publishDate)
+      model.publishDate = toDate(model.publishDate)
     }
 
     // ISBNs
@@ -347,11 +328,77 @@ export function processModel(row: any): any {
   }
 
   if (model?.created) {
-    model.created = new Date(model.created.value)
+    model.created = toDate(model.created.value)
   }
   if (model?.lastModified) {
-    model.lastModified = new Date(model.lastModified.value)
+    model.lastModified = toDate(model.lastModified.value)
   }
 
   return model
+}
+
+function toCamelCase(str: string): string {
+  return str.replace(/([-_][a-z])/gi, (match) => match.toUpperCase().replace('-', '').replace('_', ''))
+}
+
+function toDate(str: string): Date | null {
+  // Chrono can parse dates in most formats
+  let date = chrono.parseDate(str)
+  if (date) return date
+
+  // Often we just get a 4 digit year
+  if (/^\d{4}$/.test(str)) {
+    date = new Date(parseInt(str), 0, 1)
+    if (!isNaN(date.getTime())) return date
+  }
+
+  // If it can't parse, check if we have 3 blocks of numbers
+  const dateParts = str.match(/\d+/g)
+  if (!dateParts || dateParts.length !== 3) {
+    return null
+  }
+
+  let year, month, day
+  let [first, second, third] = dateParts.map(Number)
+
+  const currentYearTwoDigits = new Date().getFullYear() % 100
+
+  // Attempt to work out which part is which
+  // Heuristics based on valid values for each part
+  if (third > 31) {
+    year = third
+
+    if (first <= 12 && second <= 31) {
+      day = second
+      month = first
+    } else if (second <= 12 && first <= 31) {
+      day = first
+      month = second
+    } else {
+      return null
+    }
+  } else if (first > 31) {
+    day = third
+    month = second
+    year = first
+  } else if (first > 12) {
+    day = first
+    month = second
+    year = third <= currentYearTwoDigits ? 2000 + third : 1900 + third
+  } else {
+    day = second
+    month = first
+    year = third <= currentYearTwoDigits ? 2000 + third : 1900 + third
+  }
+
+  // Sometimes dates are readable but invalid e.g. 31/2/2024
+  // The Date here looks wrong but it's just JS weirdness
+  const daysInMonth = new Date(year, month, 0).getDate()
+  if (day > daysInMonth) {
+    day = daysInMonth
+  }
+
+  // Month parameter is 0-indexed
+  date = new Date(year, month - 1, day)
+  return date && !isNaN(date.getTime()) ? date : null
 }

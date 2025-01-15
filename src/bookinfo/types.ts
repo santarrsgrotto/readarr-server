@@ -63,6 +63,8 @@ export type BookInfoWork = {
   ReleaseDate: string
   Url: string
   Genres: string[]
+  RatingCount: number
+  AverageRating: number
   Authors?: BookInfoAuthor[] | null
   // Foreign IDs
   RelatedWorks: number[]
