@@ -24,6 +24,8 @@ export default async function search(query: string): Promise<Response> {
     edition = await model.getEdition(query.substring(8))
   } else if (query.startsWith('isbn:')) {
     edition = await searchByIsbn(query.substring(5))
+  } else if (/^\d{9}[\dXx]$|^\d{12}[\dXx]$/.test(query)) {
+    edition = await searchByIsbn(query)
   } else if (query.startsWith('work:')) {
     work = await model.getWork(query.substring(5))
   }
@@ -36,12 +38,6 @@ export default async function search(query: string): Promise<Response> {
     }
   } else {
     results = (await searchByName(query)) ?? []
-  }
-
-  // If there's only one result Readarr doesn't seem to show it
-  // so we just include the same one twice
-  if (results.length == 1) {
-    results.push(results[0])
   }
 
   let response: string
@@ -100,6 +96,12 @@ async function searchByName(query: string): Promise<BookSearch[] | null> {
     const queryAuthorName = normalizeAuthorName(query)
     const aAuthorSimilarity = similarity(aAuthorName, queryAuthorName)
     const bAuthorSimilarity = similarity(bAuthorName, queryAuthorName)
+
+    // For same named authors, use existing rank
+    // This will prioritise author matches over title matches
+    if (bAuthorSimilarity === aAuthorSimilarity && aAuthorSimilarity > 0.8) {
+      return a.rank - b.rank
+    }
 
     // Prioritize author similarity >= 0.8
     if (aAuthorSimilarity >= 0.8 && bAuthorSimilarity < 0.9) return -1
@@ -166,7 +168,10 @@ async function searchAuthorsByName(query: string): Promise<Author[]> {
 
   const bindParams = [pattern, query, config.search.maxAuthors]
 
-  return db.query(sql, bindParams).then((res) => Promise.all(res.rows.map((author) => model.processModel(author))))
+  return db
+    .query(sql, bindParams)
+    .then((res) => Promise.all(res.rows.map((author) => model.processModel(author) as unknown as Author)))
+    .then((res) => res.filter((author): author is Author => author != null))
 }
 
 async function searchWorksByTitle(query: string, split: { title: string; author: string } | null): Promise<Work[]> {
@@ -233,7 +238,10 @@ async function searchWorksByTitle(query: string, split: { title: string; author:
     ? [pattern, split.title, config.search.maxTitles, split.author]
     : [pattern, query, config.search.maxTitles]
 
-  return db.query(sql, bindParams).then((res) => Promise.all(res.rows.map((work) => model.processModel(work))))
+  return db
+    .query(sql, bindParams)
+    .then((res) => Promise.all(res.rows.map((work) => model.processModel(work) as unknown as Work)))
+    .then((res) => res.filter((work): work is Work => work != null))
 }
 
 /** Find an edition based on ISBN (tries ISBN and ISBN-13) */

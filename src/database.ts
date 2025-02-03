@@ -19,8 +19,8 @@ async function closeDb() {
     console.log('Closing database connections...')
     await db.end()
     console.log('Database connections closed.')
-  } catch (err) {
-    console.error('Error closing database connections:', err)
+  } catch (error) {
+    console.error('Error closing database connections:', error)
   }
 }
 

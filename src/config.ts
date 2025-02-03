@@ -23,8 +23,15 @@ function getBoolean(key: string, defaultValue: boolean): boolean {
 const config = {
   hostname: getString('HOSTNAME', '0.0.0.0'),
   port: getNumber('PORT', 8080),
+  workers: getNumber('WORKERS', 10),
   postgres: {
     connectionString: getString('POSTGRES_CONNECTION_STRING', ''),
+    // Maximum number of connections in the pool
+    maxConnections: getNumber('POSTGRES_MAX_CONNECTIONS', 50),
+    // Idle timeout in seconds
+    idleTimeout: getNumber('POSTGRES_IDLE_TIMEOUT', 30),
+    // Timeout for establishing a new connection
+    connectionTimeout: getNumber('POSTGRES_CONNECTION_TIMEOUT', 20),
   },
   // 3 character language code
   defaultLanguage: getString('DEFAULT_LANGUAGE', '') ?? null,
@@ -46,6 +53,17 @@ const config = {
     maxAuthors: getNumber('MAX_AUTHORS', 1),
     // Max books to return via title part of the search
     maxTitles: getNumber('MAX_TITLES', 3),
+  },
+  // Update process
+  update: {
+    // How many keys to process per batch
+    batchSize: getNumber('UPDATE_BATCH_SIZE', 10),
+    // Cron schedule for updating from OL
+    cron: getString('UPDATE_CRON', '0 4 * * *'),
+    // How many times to retry each page before giving up
+    retries: getNumber('UPDATE_RETRIES', 1),
+    // Seconds to wait on a request before timing out
+    timeout: getNumber('UPDATE_TIMEOUT', 30),
   },
 }
 

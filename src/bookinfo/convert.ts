@@ -120,7 +120,6 @@ export async function convertWork(
   ratings?: Rating[] | null,
 ): Promise<BookInfoWork | null> {
   editions = editions ?? (await model.getWorkEditions([work.key]))
-
   ratings = ratings ?? (editions.length > 0 ? await model.getWorkRatings([work.key], true) : [])
 
   const books: BookInfoBook[] = (
@@ -138,7 +137,7 @@ export async function convertWork(
 
   const earliestPublishDate = editions
     .map((edition) => edition.publishDate)
-    .filter((date): date is Date => date !== undefined) // Type guard to ensure 'date' is 'Date'
+    .filter((date): date is Date => date !== undefined)
     .reduce(
       (earliest: Date | null, current: Date) => (earliest === null || current < earliest ? current : earliest),
       null as Date | null,

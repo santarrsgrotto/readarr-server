@@ -21,19 +21,32 @@ export function formatFormat(physicalFormat: string | undefined): string {
     // Since just using format makes it think format may be null despite the if block
     const format = physicalFormat.toLowerCase()
 
-    const ebookFormats = ['epub', 'mobi', 'ebook', 'e-book', 'digital', 'kindle']
-    const audiobookFormats = ['audio', 'mp3', 'cd', 'cassette']
-    const hardbackFormats = ['hardback', 'hardcover', 'hard back', 'hard cover']
+    const audibleKeywords = ['audible']
+    const audiobookKeywords = ['audio']
+    const cassetteKeywords = ['casette']
+    const cdKeywords = ['cd']
+    const cdRomKeywords = ['cd-rom', 'cd rom']
+    const ebookKeywords = ['epub', 'mobi', 'ebook', 'e-book', 'digital']
+    const hardbackKeywords = ['hardback', 'hardcover', 'hard back', 'hard cover']
+    const kindleKeywords = ['kindle']
+    const nookKeywords = ['nook']
+    const mp3Keywords = ['mp3']
 
-    // Redarr checks for ebook lowercase, yet Audiobook capitalise
-    if (ebookFormats.some((keyword) => format.includes(keyword))) return 'ebook'
-    if (audiobookFormats.some((keyword) => format.includes(keyword))) return 'Audiobook'
-    if (hardbackFormats.some((keyword) => format.includes(keyword))) return 'Hardback'
+    // Attempt to mad OL format to standard GR formats (order is important here)
+    if (kindleKeywords.some((keyword) => format.includes(keyword))) return 'Kindle Edition'
+    if (nookKeywords.some((keyword) => format.includes(keyword))) return 'nook'
+    if (cassetteKeywords.some((keyword) => format.includes(keyword))) return 'Audio Cassette'
+    if (cdRomKeywords.some((keyword) => format.includes(keyword))) return 'CD-ROM'
+    if (mp3Keywords.some((keyword) => format.includes(keyword))) return 'MP3 CD'
+    if (ebookKeywords.some((keyword) => format.includes(keyword))) return 'ebook'
+    if (hardbackKeywords.some((keyword) => format.includes(keyword))) return 'Hardback'
+    if (audibleKeywords.some((keyword) => format.includes(keyword))) return 'Audible Audio'
+    if (cdKeywords.some((keyword) => format.includes(keyword))) return 'Audio CD'
+    if (audiobookKeywords.some((keyword) => format.includes(keyword))) return 'Audiobook'
   }
 
   return 'Paperback'
 }
-
 /** Escapes html */
 export function formatHtml(html: string | undefined): string {
   return html ? escapeHTML(html) : ''

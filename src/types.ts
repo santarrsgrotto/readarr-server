@@ -1,8 +1,6 @@
 export type Id = string
 
-export type Author = {
-  key: Id
-
+export type Author = Model & {
   entity_type?: string
 
   name: string
@@ -17,15 +15,9 @@ export type Author = {
 
   /** IDs for the cover images */
   photos?: Id[]
-
-  created: Date
-  lastModified?: Date
 }
 
-export type Edition = {
-  key: Id
-  revision: number
-
+export type Edition = Model & {
   title: string
   full_title?: string
   description?: string
@@ -53,9 +45,15 @@ export type Edition = {
   languages?: string[]
   translatedFrom?: string[]
   physicalFormat?: string
+}
 
+// Base model
+export type Model = {
+  key: Id
+  type: string
+  revision: number
   created: Date
-  lastModified?: Date
+  lastModified: Date
 }
 
 // Aggregate rating for a work
@@ -66,6 +64,16 @@ export type Rating = {
   count: number
 }
 
+// Raw JSON
+export type Record = {
+  key: Id
+  type: { key: string }
+  revision: number
+  last_modified: { type: string; value: string }
+  authors?: { author: { key: string } }[]
+  works?: { key?: string }[]
+}
+
 export type Series = {
   workId: number
   seriesId: number
@@ -73,8 +81,7 @@ export type Series = {
   title: string
 }
 
-export type Work = {
-  key: Id
+export type Work = Model & {
   authorKey?: string
 
   title: string
@@ -102,7 +109,4 @@ export type Work = {
   subjectPeople?: string[]
 
   firstPublishDate?: string
-
-  created: Date
-  lastModified?: Date
 }

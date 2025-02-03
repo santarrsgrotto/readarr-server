@@ -9,13 +9,11 @@ export default async function edition(id: string): Promise<Response> {
       return new Response(null, { status: 404 })
     }
 
-    const route = edition.workKey
-      ? '/bookinfo/v1/work/' + ids.encodeReadarrId(edition.workKey)
-      : '/bookinfo/v1/author/' + ids.encodeReadarrId(edition.authors[0])
-
+    // We always redirect to author because whereas Readarr has code to handle works too
+    // that doesn't appear to work if the author hasn't been previously added by the client
     return new Response(null, {
       status: 302,
-      headers: { Location: route },
+      headers: { Location: '/bookinfo/v1/author/' + ids.encodeReadarrId(edition.authors[0]) },
     })
   } catch (error) {
     const err = error as Error

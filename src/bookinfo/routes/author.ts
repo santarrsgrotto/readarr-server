@@ -4,8 +4,16 @@ import { convertAuthor, convertSeries, convertWork } from '../convert'
 import * as ids from '../../ids'
 import * as model from '../../model'
 
-export default async function author(id: string): Promise<Response> {
+export default async function author(id: string, workLimit: number = 1000): Promise<Response> {
   try {
+    const response = await model.getCache('/type/author', id)
+
+    if (response) {
+      return new Response(response, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const author = await model.getAuthor(id)
 
     if (!author) {
@@ -14,9 +22,9 @@ export default async function author(id: string): Promise<Response> {
 
     const bookInfoAuthor = await convertAuthor(author)
 
-    bookInfoAuthor.Works = (await getWorks(author)).map((work: BookInfoWork) => {
+    bookInfoAuthor.Works = (await getWorks(author, workLimit)).map((work: BookInfoWork) => {
       // Readarr expects this nested like a Russian doll
-      work.Authors = [{ ...bookInfoAuthor, Works: [{ ...work, Books: null, Authors: null }] }]
+      work.Authors = [{ ...bookInfoAuthor, Works: [] }]
       return work
     })
 
@@ -40,8 +48,8 @@ export default async function author(id: string): Promise<Response> {
   }
 }
 
-async function getWorks(author: Author): Promise<BookInfoWork[]> {
-  const works = await model.getAuthorWorks(author.key)
+async function getWorks(author: Author, workLimit: number | null): Promise<BookInfoWork[]> {
+  const works = await model.getAuthorWorks(author.key, workLimit)
   const workKeys = works.map((work) => work.key)
 
   const [editions, ratings] = await Promise.all([model.getWorkEditions(workKeys), model.getWorkRatings(workKeys, true)])
