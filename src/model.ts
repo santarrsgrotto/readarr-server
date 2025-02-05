@@ -243,6 +243,16 @@ export async function getWork(id: string): Promise<Work | null> {
     .then((res) => processModel(res.rows[0]) as unknown as Work | null)
 }
 
+/** Get just the main author for a work **/
+export async function getWorkAuthor(id: string): Promise<string | null> {
+  const key = ids.isGoodreadsId(id) ? await workToOl(id) : ids.convertOlId(id, 'work')
+  if (!key) return null
+
+  return await db
+    .query(`SELECT data->'authors'->0->'author'->'key' as author_key FROM works WHERE key = $1`, [key])
+    .then((res) => res.rows[0]?.author_key as string | null)
+}
+
 /** Get a single editions for a given work ID (can be Goodreads ID or OL) **/
 export async function getWorkEdition(id: string): Promise<Edition | null> {
   const key = ids.isGoodreadsId(id) ? await workToOl(id) : ids.convertOlId(id, 'work')
@@ -386,13 +396,6 @@ export async function processModel(row: any): Promise<Model | null> {
   } else if (model.type.key == '/type/edition') {
     model.workKey = model.works?.[0]?.key
 
-    if (model.authors) {
-      // Authors should be flat array of IDs
-      model.authors = model.authors
-        .filter((author: { key?: string }) => author.key)
-        .map((author: { key: string }) => author.key)
-    }
-
     if (model.languages) {
       // Languages should be a flat array of language codes
       model.languages = model.languages
@@ -405,6 +408,19 @@ export async function processModel(row: any): Promise<Model | null> {
       model.works = model.works
         .filter((work: { key?: string }) => work && work.key)
         .map((work: { key: string }) => work.key)
+    }
+
+    if (model.authors) {
+      // Authors should be flat array of IDs
+      model.authors = model.authors
+        .filter((author: { key?: string }) => author.key)
+        .map((author: { key: string }) => author.key)
+    } else if (model.workKey) {
+      const workAuthor = await getWorkAuthor(model.workKey)
+
+      if (workAuthor) {
+        model.authors = [workAuthor]
+      }
     }
 
     // This is a year not a date
