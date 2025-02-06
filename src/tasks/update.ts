@@ -14,7 +14,10 @@ async function update(): Promise<void> {
     if (!unprocessedKeys.authors.length && !unprocessedKeys.works.length && !unprocessedKeys.editions.length) {
       await model.saveDatetime('update_keys_start_time', new Date())
       unprocessedKeys = await fetchKeys()
-      await model.saveDatetime('update_keys_time', new Date(), true)
+
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      await model.saveDatetime('update_keys_time', yesterday, true)
     }
 
     await model.saveDatetime('update_started', new Date())
@@ -88,8 +91,6 @@ async function processKeys(type: string, keys: string[]) {
   let delay: number = 0
 
   while (remainingKeys.length > 0) {
-    console.log(`Remaining ${remainingKeys.length} ${type} keys...`)
-
     const batch = remainingKeys.slice(0, config.update.batchSize)
     const failedKeys = await updateModels(batch)
 

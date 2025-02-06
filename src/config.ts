@@ -59,7 +59,7 @@ const config = {
     // How many keys to process per batch
     batchSize: getNumber('UPDATE_BATCH_SIZE', 10),
     // Cron schedule for updating from OL
-    cron: getString('UPDATE_CRON', '0 4 * * *'),
+    cron: getString('UPDATE_CRON', '30 * * * *'),
     // How many times to retry each page before giving up
     retries: getNumber('UPDATE_RETRIES', 1),
     // Seconds to wait on a request before timing out

@@ -174,7 +174,7 @@ export async function getStore(key: string, cache: boolean = true): Promise<any>
 
 /** Saves data to the key/value store */
 export async function setStore(key: string, value: any, cache: boolean = true): Promise<void> {
-  value = JSON.stringify(value)
+  value = value === null ? null : JSON.stringify(value)
 
   await db.query(
     `
