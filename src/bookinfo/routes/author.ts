@@ -1,28 +1,31 @@
-import type { Author } from '../../types'
+import type { Author, Edition, Work } from '../../types'
 import type { BookInfoWork } from '../types'
 import { convertAuthor, convertSeries, convertWork } from '../convert'
 import * as ids from '../../ids'
 import * as model from '../../model'
 
-export default async function author(id: string, workLimit: number = 1000): Promise<Response> {
+export default async function author(
+  id: string,
+  editionId: string | null = null,
+  workLimit: number = 1000,
+): Promise<Response> {
   try {
-    const response = await model.getCache('/type/author', id)
+    // If there's an edition we will limit to just that
+    const edition = editionId ? await model.getEdition(editionId) : null
 
-    if (response) {
-      return new Response(response, {
-        headers: { 'Content-Type': 'application/json' },
-      })
+    if (!edition) {
+      const response = await getCachedResponse(id)
+      if (response) response
     }
 
     const author = await model.getAuthor(id)
-
     if (!author) {
       return new Response(null, { status: 404 })
     }
 
     const bookInfoAuthor = await convertAuthor(author)
 
-    bookInfoAuthor.Works = (await getWorks(author, workLimit)).map((work: BookInfoWork) => {
+    bookInfoAuthor.Works = (await getWorks(author, edition, workLimit)).map((work: BookInfoWork) => {
       // Readarr expects this nested like a Russian doll
       work.Authors = [{ ...bookInfoAuthor, Works: [] }]
       return work
@@ -48,11 +51,27 @@ export default async function author(id: string, workLimit: number = 1000): Prom
   }
 }
 
-async function getWorks(author: Author, workLimit: number | null): Promise<BookInfoWork[]> {
-  const works = await model.getAuthorWorks(author.key, workLimit)
+async function getCachedResponse(id: string): Promise<Response | null> {
+  const response = await model.getCache('/type/author', id)
+
+  return response
+    ? new Response(response, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    : null
+}
+
+async function getWorks(author: Author, edition: Edition | null, workLimit: number | null): Promise<BookInfoWork[]> {
+  const works = edition
+    ? [await model.getWork(edition.workKey)].filter((work): work is Work => work !== null)
+    : await model.getAuthorWorks(author.key, workLimit)
+
   const workKeys = works.map((work) => work.key)
 
-  const [editions, ratings] = await Promise.all([model.getWorkEditions(workKeys), model.getWorkRatings(workKeys, true)])
+  const [editions, ratings] = await Promise.all([
+    edition ? [edition] : model.getWorkEditions(workKeys),
+    model.getWorkRatings(workKeys, true),
+  ])
 
   return await Promise.all(
     works

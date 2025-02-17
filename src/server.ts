@@ -72,7 +72,9 @@ if (clusterMode && mainProcess) {
       })
 
       router.get('/bookinfo/v1/author/changed', async ({ params: { since } }) => bookInfoChanged(since))
-      router.get('/bookinfo/v1/author/:id', async ({ params: { id } }) => bookInfoAuthor(id))
+      router.get('/bookinfo/v1/author/:id', async ({ params: { id }, query }) =>
+        bookInfoAuthor(id, (query.edition as string | null) ?? null),
+      )
       router.get('/bookinfo/v1/book/:id', async ({ params: { id } }) => bookInfoEdition(id))
       router.get('/bookinfo/v1/work/:id', async ({ params: { id } }) => bookInfoWork(id))
       router.post('/bookinfo/v1/book/bulk', async (req) => req.json().then(bookInfoBulk))

@@ -25,7 +25,9 @@ async function update(): Promise<void> {
     await processKeys('author', unprocessedKeys.authors)
     await processKeys('work', unprocessedKeys.works)
     await processKeys('edition', unprocessedKeys.editions)
-    await model.saveDatetime('update_finished', new Date())
+
+    const finished = new Date()
+    await model.saveDatetime('update_finished', finished)
   } catch (error) {
     const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
     await model.setStore('update_error', errorMessage)

@@ -220,7 +220,6 @@ export async function getUpdateTime(): Promise<Date> {
 export async function saveDatetime(key: string, date: Date, dateOnly: boolean = false): Promise<void> {
   let dateString = dateOnly ? date.toISOString().split('T')[0] : date.toISOString()
 
-  // Only save the date portion
   await setStore(key, dateString)
 }
 
