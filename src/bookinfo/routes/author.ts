@@ -21,7 +21,7 @@ export default async function author(
 
     if (!edition) {
       const response = await getCachedResponse(key)
-      if (response) response
+      if (response) return response
     }
 
     const author = await model.getAuthor(key)
