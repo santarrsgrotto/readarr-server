@@ -10,15 +10,21 @@ export default async function author(
   workLimit: number = 1000,
 ): Promise<Response> {
   try {
+    const key = ids.isGoodreadsId(id) ? await model.authorToOl(id) : ids.convertOlId(id, 'author')
+
+    if (!key) {
+      return new Response(null, { status: 404 })
+    }
+
     // If there's an edition we will limit to just that
     const edition = editionId ? await model.getEdition(editionId) : null
 
     if (!edition) {
-      const response = await getCachedResponse(id)
+      const response = await getCachedResponse(key)
       if (response) response
     }
 
-    const author = await model.getAuthor(id)
+    const author = await model.getAuthor(key)
     if (!author) {
       return new Response(null, { status: 404 })
     }
