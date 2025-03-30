@@ -587,6 +587,22 @@ export async function saveModel(record: Record): Promise<void> {
     columns.push('work_key')
     values.push(record.works?.[0]?.key ?? null)
     placeholders.push(`$${placeholderIndex++}`)
+
+    const isbns = ['isbn_10', 'isbn_13']
+
+    isbns.forEach(async (isbn) => {
+      if ((record as any)[isbn]) {
+        await db.query(
+          `
+          INSERT INTO edition_isbns (edition_key, ${isbn}})
+          VALUES ($1, $2)
+          ON CONFLICT (edition_key, isbn)
+          DO NOTHING
+          `,
+          [record.key, (record as any)[isbn]],
+        )
+      }
+    })
   }
 
   // Update author_works table
