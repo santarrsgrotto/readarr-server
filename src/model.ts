@@ -136,11 +136,13 @@ export async function getEdition(id: string): Promise<Edition | null> {
 export async function getLargeAuthors(): Promise<string[]> {
   const client = await db.connect()
 
-  // Ensure the query doesn't time out
-  await client.query('SET statement_timeout = 0')
+  try {
+    await client.query('BEGIN')
 
-  return await client
-    .query(
+    // Ensure the query doesn't time out
+    await client.query('SET LOCAL statement_timeout = 0')
+
+    const result = await client.query(
       `
         WITH work_counts AS (
           SELECT author_key, COUNT(DISTINCT work_key) as work_count
@@ -152,7 +154,16 @@ export async function getLargeAuthors(): Promise<string[]> {
         WHERE work_count > 1000
       `,
     )
-    .then((res) => Promise.all(res.rows.map((row) => row.author_key)))
+
+    await client.query('COMMIT')
+
+    return Promise.all(result.rows.map((row) => row.author_key))
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
 }
 
 /** Get data from the key/value store */
