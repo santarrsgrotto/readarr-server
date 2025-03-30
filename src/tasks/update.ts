@@ -28,6 +28,7 @@ async function update(): Promise<void> {
 
     const finished = new Date()
     await model.saveDatetime('update_finished', finished)
+    await model.setStore('update_error', null)
   } catch (error) {
     const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
     await model.setStore('update_error', errorMessage)
