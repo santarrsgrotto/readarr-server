@@ -594,7 +594,7 @@ export async function saveModel(record: Record): Promise<void> {
       if ((record as any)[isbn]) {
         await db.query(
           `
-          INSERT INTO edition_isbns (edition_key, ${isbn}})
+          INSERT INTO edition_isbns (edition_key, ${isbn})
           VALUES ($1, $2)
           ON CONFLICT (edition_key, isbn)
           DO NOTHING
